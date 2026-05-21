@@ -1,0 +1,315 @@
+// ================================================
+// MindWeave — Prisma Schema
+// ================================================
+// PostgreSQL database hosted on Neon (serverless)
+// 11 models matching the Agent Task Document spec
+// ================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================
+// 1. ROLES & PERMISSIONS (RBAC)
+// ============================================
+
+model Role {
+  id          Int              @id @default(autoincrement())
+  name        String           @unique // 'user', 'premium_user', 'master'
+  description String?
+  createdAt   DateTime         @default(now()) @map("created_at")
+  users       User[]
+  permissions RolePermission[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id          Int              @id @default(autoincrement())
+  name        String           @unique // 'write_entry', 'view_entries', etc.
+  description String?
+  category    String? // 'journaling', 'ai_features', 'export', 'admin'
+  createdAt   DateTime         @default(now()) @map("created_at")
+  roles       RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  id           Int        @id @default(autoincrement())
+  roleId       Int        @map("role_id")
+  permissionId Int        @map("permission_id")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+// ============================================
+// 2. USERS
+// ============================================
+
+model User {
+  id                   Int              @id @default(autoincrement())
+  email                String           @unique
+  passwordHash         String           @map("password_hash")
+  name                 String
+  roleId               Int              @map("role_id")
+  subscriptionTier     String           @default("free") @map("subscription_tier")
+  isActive             Boolean          @default(true) @map("is_active")
+  isVerified           Boolean          @default(false) @map("is_verified")
+  verificationToken    String?          @map("verification_token")
+  resetPasswordToken   String?          @map("reset_password_token")
+  resetPasswordExpires DateTime?        @map("reset_password_expires")
+  lastLogin            DateTime?        @map("last_login")
+  onboardingCompleted  Boolean          @default(false) @map("onboarding_completed")
+  journeyReason        String?          @map("journey_reason")
+  createdAt            DateTime         @default(now()) @map("created_at")
+  updatedAt            DateTime         @updatedAt @map("updated_at")
+
+  // Relations
+  role          Role             @relation(fields: [roleId], references: [id])
+  entries       JournalEntry[]
+  stories       WeeklyStory[]
+  reflections   AiReflection[]
+  insights      PatternInsight[]
+  subscription  Subscription?
+  refreshTokens RefreshToken[]
+  preferences   UserPreference?
+  milestones    Milestone[]
+  auditLogs     AuditLog[]
+
+  @@index([email])
+  @@index([roleId])
+  @@index([subscriptionTier])
+  @@map("users")
+}
+
+// ============================================
+// 3. JOURNAL ENTRIES
+// ============================================
+
+model JournalEntry {
+  id                   Int            @id @default(autoincrement())
+  userId               Int            @map("user_id")
+  entryDate            DateTime       @map("entry_date") @db.Date
+  entryText            String         @map("entry_text")
+  moodBefore           String?        @map("mood_before")
+  moodAfter            String?        @map("mood_after")
+  tags                 String[]       @default([])
+  wordCount            Int?           @map("word_count")
+  isVoiceTranscription Boolean        @default(false) @map("is_voice_transcription")
+  createdAt            DateTime       @default(now()) @map("created_at")
+  updatedAt            DateTime       @updatedAt @map("updated_at")
+
+  // Relations
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reflections AiReflection[]
+
+  @@index([userId, entryDate(sort: Desc)])
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("journal_entries")
+}
+
+// ============================================
+// 4. WEEKLY STORIES
+// ============================================
+
+model WeeklyStory {
+  id                  Int      @id @default(autoincrement())
+  userId              Int      @map("user_id")
+  weekStartDate       DateTime @map("week_start_date") @db.Date
+  weekEndDate         DateTime @map("week_end_date") @db.Date
+  storyTitle          String?  @map("story_title")
+  storyContent        String   @map("story_content")
+  narrativeStyle      String   @default("third_person") @map("narrative_style")
+  emotionalJourney    Json?    @map("emotional_journey")
+  keyThemes           String[] @default([]) @map("key_themes")
+  highlightedQuotes   String[] @default([]) @map("highlighted_quotes")
+  strengthRecognition String?  @map("strength_recognition")
+  entryCount          Int?     @map("entry_count")
+  aiProcessingTime    Int?     @map("ai_processing_time")
+  isFavorited         Boolean  @default(false) @map("is_favorited")
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, weekStartDate(sort: Desc)])
+  @@map("weekly_stories")
+}
+
+// ============================================
+// 5. AI REFLECTIONS
+// ============================================
+
+model AiReflection {
+  id             Int      @id @default(autoincrement())
+  entryId        Int      @map("entry_id")
+  userId         Int      @map("user_id")
+  reflectionText String   @map("reflection_text")
+  reflectionType String   @default("post_entry") @map("reflection_type")
+  isRead         Boolean  @default(false) @map("is_read")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  // Relations
+  entry JournalEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  user  User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([entryId])
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("ai_reflections")
+}
+
+// ============================================
+// 6. PATTERN INSIGHTS
+// ============================================
+
+model PatternInsight {
+  id                 Int       @id @default(autoincrement())
+  userId             Int       @map("user_id")
+  insightType        String?   @map("insight_type")
+  insightTitle       String?   @map("insight_title")
+  insightDescription String?   @map("insight_description")
+  supportingData     Json?     @map("supporting_data")
+  dateRangeStart     DateTime? @map("date_range_start") @db.Date
+  dateRangeEnd       DateTime? @map("date_range_end") @db.Date
+  confidenceScore    Decimal?  @map("confidence_score") @db.Decimal(3, 2)
+  isAcknowledged     Boolean   @default(false) @map("is_acknowledged")
+  createdAt          DateTime  @default(now()) @map("created_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("pattern_insights")
+}
+
+// ============================================
+// 7. SUBSCRIPTIONS
+// ============================================
+
+model Subscription {
+  id                 Int       @id @default(autoincrement())
+  userId             Int       @unique @map("user_id")
+  subscriptionTier   String    @map("subscription_tier")
+  status             String    @default("active")
+  paymentProvider    String?   @map("payment_provider")
+  paymentProviderId  String?   @map("payment_provider_id")
+  billingCycle       String?   @map("billing_cycle")
+  amount             Decimal?  @db.Decimal(10, 2)
+  currency           String    @default("USD")
+  trialStartDate     DateTime? @map("trial_start_date")
+  trialEndDate       DateTime? @map("trial_end_date")
+  currentPeriodStart DateTime? @map("current_period_start")
+  currentPeriodEnd   DateTime? @map("current_period_end")
+  cancelAtPeriodEnd  Boolean   @default(false) @map("cancel_at_period_end")
+  cancelledAt        DateTime? @map("cancelled_at")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@map("subscriptions")
+}
+
+// ============================================
+// 8. REFRESH TOKENS
+// ============================================
+
+model RefreshToken {
+  id              Int       @id @default(autoincrement())
+  userId          Int       @map("user_id")
+  token           String    @unique
+  expiresAt       DateTime  @map("expires_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  revokedAt       DateTime? @map("revoked_at")
+  replacedByToken String?   @map("replaced_by_token")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@map("refresh_tokens")
+}
+
+// ============================================
+// 9. USER PREFERENCES
+// ============================================
+
+model UserPreference {
+  id                        Int      @id @default(autoincrement())
+  userId                    Int      @unique @map("user_id")
+  aiInvolvementLevel        String   @default("moderate") @map("ai_involvement_level")
+  enableReflectiveResponses Boolean  @default(true) @map("enable_reflective_responses")
+  enablePatternInsights     Boolean  @default(true) @map("enable_pattern_insights")
+  enableWritingPrompts      Boolean  @default(true) @map("enable_writing_prompts")
+  notificationDailyReminder Boolean  @default(true) @map("notification_daily_reminder")
+  notificationTime          String   @default("20:00") @map("notification_time")
+  notificationWeeklyStory   Boolean  @default(true) @map("notification_weekly_story")
+  theme                     String   @default("system")
+  textSize                  String   @default("medium") @map("text_size")
+  weeklyStoryDay            String   @default("sunday") @map("weekly_story_day")
+  narrativeStylePreference  String   @default("third_person") @map("narrative_style_preference")
+  createdAt                 DateTime @default(now()) @map("created_at")
+  updatedAt                 DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_preferences")
+}
+
+// ============================================
+// 10. MILESTONES
+// ============================================
+
+model Milestone {
+  id                   Int      @id @default(autoincrement())
+  userId               Int      @map("user_id")
+  milestoneType        String   @map("milestone_type")
+  milestoneTitle       String?  @map("milestone_title")
+  milestoneDescription String?  @map("milestone_description")
+  achievedAt           DateTime @default(now()) @map("achieved_at")
+  isViewed             Boolean  @default(false) @map("is_viewed")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, achievedAt(sort: Desc)])
+  @@map("milestones")
+}
+
+// ============================================
+// 11. AUDIT LOGS
+// ============================================
+
+model AuditLog {
+  id           Int      @id @default(autoincrement())
+  userId       Int?     @map("user_id")
+  action       String
+  resourceType String?  @map("resource_type")
+  resourceId   Int?     @map("resource_id")
+  ipAddress    String?  @map("ip_address")
+  userAgent    String?  @map("user_agent")
+  status       String?
+  errorMessage String?  @map("error_message")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  // Relations
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([action, createdAt(sort: Desc)])
+  @@map("audit_logs")
+}

@@ -1,0 +1,41 @@
+export const PERMISSIONS = {
+  WRITE_ENTRY: "write_entry",
+  VIEW_ENTRIES: "view_entries",
+  GENERATE_WEEKLY_STORY: "generate_weekly_story",
+  RECEIVE_AI_REFLECTIONS: "receive_ai_reflections",
+  VIEW_PATTERN_INSIGHTS: "view_pattern_insights",
+  GENERATE_MONTHLY_REPORT: "generate_monthly_report",
+  UNLIMITED_HISTORY: "unlimited_history",
+  CLOUD_BACKUP: "cloud_backup",
+  EXPORT_DATA: "export_data",
+  MULTIPLE_STORY_STYLES: "multiple_story_styles",
+  VOICE_TRANSCRIPTION: "voice_transcription",
+  CUSTOM_THEMES: "custom_themes",
+  ADMIN_ACCESS: "admin_access",
+} as const;
+
+export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
+
+export const FREE_PERMISSIONS: Permission[] = [
+  PERMISSIONS.WRITE_ENTRY,
+  PERMISSIONS.VIEW_ENTRIES,
+  PERMISSIONS.GENERATE_WEEKLY_STORY,
+];
+
+export const PREMIUM_PERMISSIONS: Permission[] = [
+  ...FREE_PERMISSIONS,
+  PERMISSIONS.RECEIVE_AI_REFLECTIONS,
+  PERMISSIONS.VIEW_PATTERN_INSIGHTS,
+  PERMISSIONS.GENERATE_MONTHLY_REPORT,
+  PERMISSIONS.UNLIMITED_HISTORY,
+  PERMISSIONS.CLOUD_BACKUP,
+  PERMISSIONS.EXPORT_DATA,
+  PERMISSIONS.MULTIPLE_STORY_STYLES,
+  PERMISSIONS.VOICE_TRANSCRIPTION,
+  PERMISSIONS.CUSTOM_THEMES,
+];
+
+export const MASTER_PERMISSIONS: Permission[] = [
+  ...PREMIUM_PERMISSIONS,
+  PERMISSIONS.ADMIN_ACCESS,
+];

@@ -1,0 +1,48 @@
+# ================================================
+# MindWeave — Local Development Docker Compose
+# ================================================
+# Provides PostgreSQL and Redis for local dev.
+# The Next.js app runs natively (npm run dev).
+#
+# Usage:
+#   docker compose up -d        # Start services
+#   docker compose down         # Stop services
+#   docker compose down -v      # Stop + delete data
+# ================================================
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: mindweave-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: mindweave
+      POSTGRES_PASSWORD: mindweave_local
+      POSTGRES_DB: mindweave
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mindweave -d mindweave"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: mindweave-redis
+    restart: unless-stopped
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+  redis_data:
